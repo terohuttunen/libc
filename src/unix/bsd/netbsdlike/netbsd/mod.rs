@@ -401,11 +401,6 @@ s! {
         pub sdl_data: [::c_char; 12],
     }
 
-    pub struct mmsghdr {
-        pub msg_hdr: ::msghdr,
-        pub msg_len: ::c_uint,
-    }
-
     pub struct __exit_status {
         pub e_termination: u16,
         pub e_exit: u16,
@@ -1878,6 +1873,8 @@ pub const MNT_NOWAIT: ::c_int = 2;
 pub const MNT_LAZY: ::c_int = 3;
 
 //<sys/timex.h>
+pub const CLOCK_PROCESS_CPUTIME_ID: ::clockid_t = 2;
+pub const CLOCK_THREAD_CPUTIME_ID: ::clockid_t = 4;
 pub const NTP_API: ::c_int = 4;
 pub const MAXPHASE: ::c_long = 500000000;
 pub const MAXFREQ: ::c_long = 500000;
@@ -2330,7 +2327,7 @@ pub const PT_LWPNEXT: ::c_int = 25;
 pub const PT_SET_SIGPASS: ::c_int = 26;
 pub const PT_GET_SIGPASS: ::c_int = 27;
 pub const PT_FIRSTMACH: ::c_int = 32;
-pub const POSIX_SPAWN_RETURNERROR: ::c_int = 0x40;
+pub const POSIX_SPAWN_RETURNERROR: ::c_short = 0x40;
 
 // Flags for chflags(2)
 pub const SF_APPEND: ::c_ulong = 0x00040000;
@@ -2404,6 +2401,33 @@ pub const RB_USERCONF: ::c_int = 0x000001000;
 pub const fn MAP_ALIGNED(alignment: ::c_int) -> ::c_int {
     alignment << MAP_ALIGNMENT_SHIFT
 }
+
+// net/route.h
+pub const RTF_MASK: ::c_int = 0x80;
+pub const RTF_CONNECTED: ::c_int = 0x100;
+pub const RTF_ANNOUNCE: ::c_int = 0x20000;
+pub const RTF_SRC: ::c_int = 0x10000;
+pub const RTF_LOCAL: ::c_int = 0x40000;
+pub const RTF_BROADCAST: ::c_int = 0x80000;
+pub const RTF_UPDATING: ::c_int = 0x100000;
+pub const RTF_DONTCHANGEIFA: ::c_int = 0x200000;
+
+pub const RTM_VERSION: ::c_int = 4;
+pub const RTM_LOCK: ::c_int = 0x8;
+pub const RTM_IFANNOUNCE: ::c_int = 0x10;
+pub const RTM_IEEE80211: ::c_int = 0x11;
+pub const RTM_SETGATE: ::c_int = 0x12;
+pub const RTM_LLINFO_UPD: ::c_int = 0x13;
+pub const RTM_IFINFO: ::c_int = 0x14;
+pub const RTM_OCHGADDR: ::c_int = 0x15;
+pub const RTM_NEWADDR: ::c_int = 0x16;
+pub const RTM_DELADDR: ::c_int = 0x17;
+pub const RTM_CHGADDR: ::c_int = 0x18;
+
+pub const RTA_TAG: ::c_int = 0x100;
+
+pub const RTAX_TAG: ::c_int = 8;
+pub const RTAX_MAX: ::c_int = 9;
 
 const_fn! {
     {const} fn _ALIGN(p: usize) -> usize {
@@ -2651,6 +2675,11 @@ extern "C" {
         newp: *const ::c_void,
         newlen: ::size_t,
     ) -> ::c_int;
+    pub fn sysctlnametomib(
+        sname: *const ::c_char,
+        name: *mut ::c_int,
+        namelenp: *mut ::size_t,
+    ) -> ::c_int;
     #[link_name = "__kevent50"]
     pub fn kevent(
         kq: ::c_int,
@@ -2759,20 +2788,6 @@ extern "C" {
 
     pub fn kqueue1(flags: ::c_int) -> ::c_int;
 
-    pub fn sendmmsg(
-        sockfd: ::c_int,
-        msgvec: *mut ::mmsghdr,
-        vlen: ::c_uint,
-        flags: ::c_int,
-    ) -> ::c_int;
-    pub fn recvmmsg(
-        sockfd: ::c_int,
-        msgvec: *mut ::mmsghdr,
-        vlen: ::c_uint,
-        flags: ::c_int,
-        timeout: *mut ::timespec,
-    ) -> ::c_int;
-
     pub fn _lwp_self() -> lwpid_t;
     pub fn memmem(
         haystack: *const ::c_void,
@@ -2862,6 +2877,22 @@ extern "C" {
     pub fn getrandom(buf: *mut ::c_void, buflen: ::size_t, flags: ::c_uint) -> ::ssize_t;
 
     pub fn reboot(mode: ::c_int, bootstr: *mut ::c_char) -> ::c_int;
+
+    #[link_name = "___lwp_park60"]
+    pub fn _lwp_park(
+        clock: ::clockid_t,
+        flags: ::c_int,
+        ts: *const ::timespec,
+        unpark: ::lwpid_t,
+        hint: *const ::c_void,
+        unparkhint: *mut ::c_void,
+    ) -> ::c_int;
+    pub fn _lwp_unpark(lwp: ::lwpid_t, hint: *const ::c_void) -> ::c_int;
+    pub fn _lwp_unpark_all(
+        targets: *const ::lwpid_t,
+        ntargets: ::size_t,
+        hint: *const ::c_void,
+    ) -> ::c_int;
 }
 
 #[link(name = "rt")]

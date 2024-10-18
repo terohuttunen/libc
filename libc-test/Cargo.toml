@@ -1,6 +1,7 @@
 [package]
 name = "libc-test"
 version = "0.2.151"
+edition = "2021"
 authors = ["The Rust Project Developers"]
 license = "MIT OR Apache-2.0"
 build = "build.rs"
@@ -85,3 +86,8 @@ harness = true
 name = "semver"
 path = "test/semver.rs"
 harness = false
+
+[[test]]
+name = "primitive_types"
+path = "test/primitive_types.rs"
+harness = true

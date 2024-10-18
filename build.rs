@@ -1,13 +1,13 @@
 use std::env;
-use std::process::Command;
+use std::process::{Command, Output};
 use std::str;
-use std::string::String;
 
 // List of cfgs this build script is allowed to set. The list is needed to support check-cfg, as we
 // need to know all the possible cfgs that this script will set. If you need to set another cfg
 // make sure to add it to this list as well.
 const ALLOWED_CFGS: &'static [&'static str] = &[
     "emscripten_new_stat_abi",
+    "espidf_time64",
     "freebsd10",
     "freebsd11",
     "freebsd12",
@@ -17,12 +17,17 @@ const ALLOWED_CFGS: &'static [&'static str] = &[
     "libc_const_extern_fn",
     "libc_const_extern_fn_unstable",
     "libc_deny_warnings",
-    "libc_thread_local",
+    "libc_ctest",
 ];
 
 // Extra values to allow for check-cfg.
 const CHECK_CFG_EXTRA: &'static [(&'static str, &'static [&'static str])] = &[
-    ("target_os", &["switch", "aix", "ohos", "hurd"]),
+    (
+        "target_os",
+        &[
+            "switch", "aix", "ohos", "hurd", "rtems", "visionos", "nuttx",
+        ],
+    ),
     ("target_env", &["illumos", "wasi", "aix", "ohos"]),
     (
         "target_arch",
@@ -37,7 +42,7 @@ fn main() {
     let (rustc_minor_ver, is_nightly) = rustc_minor_nightly();
     let rustc_dep_of_std = env::var("CARGO_FEATURE_RUSTC_DEP_OF_STD").is_ok();
     let libc_ci = env::var("LIBC_CI").is_ok();
-    let libc_check_cfg = env::var("LIBC_CHECK_CFG").is_ok();
+    let libc_check_cfg = env::var("LIBC_CHECK_CFG").is_ok() || rustc_minor_ver >= 80;
     let const_extern_fn_cargo_feature = env::var("CARGO_FEATURE_CONST_EXTERN_FN").is_ok();
 
     // The ABI of libc used by std is backward compatible with FreeBSD 12.
@@ -45,14 +50,21 @@ fn main() {
     //
     // On CI, we detect the actual FreeBSD version and match its ABI exactly,
     // running tests to ensure that the ABI is correct.
-    match which_freebsd() {
-        Some(10) if libc_ci => set_cfg("freebsd10"),
-        Some(11) if libc_ci => set_cfg("freebsd11"),
-        Some(12) if libc_ci || rustc_dep_of_std => set_cfg("freebsd12"),
-        Some(13) if libc_ci => set_cfg("freebsd13"),
-        Some(14) if libc_ci => set_cfg("freebsd14"),
-        Some(15) if libc_ci => set_cfg("freebsd15"),
-        Some(_) | None => set_cfg("freebsd11"),
+    let which_freebsd = if libc_ci {
+        which_freebsd().unwrap_or(11)
+    } else if rustc_dep_of_std {
+        12
+    } else {
+        11
+    };
+    match which_freebsd {
+        x if x < 10 => panic!("FreeBSD older than 10 is not supported"),
+        10 => set_cfg("freebsd10"),
+        11 => set_cfg("freebsd11"),
+        12 => set_cfg("freebsd12"),
+        13 => set_cfg("freebsd13"),
+        14 => set_cfg("freebsd14"),
+        _ => set_cfg("freebsd15"),
     }
 
     match emcc_version_code() {
@@ -64,11 +76,6 @@ fn main() {
     // On CI: deny all warnings
     if libc_ci {
         set_cfg("libc_deny_warnings");
-    }
-
-    // #[thread_local] is currently unstable
-    if rustc_dep_of_std {
-        set_cfg("libc_thread_local");
     }
 
     // Rust >= 1.62.0 allows to use `const_extern_fn` for "Rust" and "C".
@@ -109,6 +116,41 @@ fn main() {
     }
 }
 
+/// Run `rustc --version` and capture the output, adjusting arguments as needed if `clippy-driver`
+/// is used instead.
+fn rustc_version_cmd(is_clippy_driver: bool) -> Output {
+    let rustc = env::var_os("RUSTC").expect("Failed to get rustc version: missing RUSTC env");
+
+    let mut cmd = match env::var_os("RUSTC_WRAPPER") {
+        Some(ref wrapper) if wrapper.is_empty() => Command::new(rustc),
+        Some(wrapper) => {
+            let mut cmd = Command::new(wrapper);
+            cmd.arg(rustc);
+            if is_clippy_driver {
+                cmd.arg("--rustc");
+            }
+
+            cmd
+        }
+        None => Command::new(rustc),
+    };
+
+    cmd.arg("--version");
+
+    let output = cmd.output().expect("Failed to get rustc version");
+
+    if !output.status.success() {
+        panic!(
+            "failed to run rustc: {}",
+            String::from_utf8_lossy(output.stderr.as_slice())
+        );
+    }
+
+    output
+}
+
+/// Return the minor version of `rustc`, as well as a bool indicating whether or not the version
+/// is a nightly.
 fn rustc_minor_nightly() -> (u32, bool) {
     macro_rules! otry {
         ($e:expr) => {
@@ -119,20 +161,14 @@ fn rustc_minor_nightly() -> (u32, bool) {
         };
     }
 
-    let rustc = otry!(env::var_os("RUSTC"));
-    let output = Command::new(rustc)
-        .arg("--version")
-        .output()
-        .ok()
-        .expect("Failed to get rustc version");
-    if !output.status.success() {
-        panic!(
-            "failed to run rustc: {}",
-            String::from_utf8_lossy(output.stderr.as_slice())
-        );
+    let mut output = rustc_version_cmd(false);
+
+    if otry!(str::from_utf8(&output.stdout).ok()).starts_with("clippy") {
+        output = rustc_version_cmd(true);
     }
 
     let version = otry!(str::from_utf8(&output.stdout).ok());
+
     let mut pieces = version.split('.');
 
     if pieces.next() != Some("rustc 1") {
@@ -189,7 +225,7 @@ fn emcc_version_code() -> Option<u64> {
 
     // Some Emscripten versions come with `-git` attached, so split the
     // version string also on the `-` char.
-    let mut pieces = version.trim().split(|c| c == '.' || c == '-');
+    let mut pieces = version.trim().split(['.', '-']);
 
     let major = pieces.next().and_then(|x| x.parse().ok()).unwrap_or(0);
     let minor = pieces.next().and_then(|x| x.parse().ok()).unwrap_or(0);

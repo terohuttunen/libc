@@ -1,6 +1,7 @@
 pub type c_char = u8;
 pub type wchar_t = u32;
 pub type __u64 = ::c_ulonglong;
+pub type __s64 = ::c_longlong;
 
 s! {
     pub struct stat {
@@ -191,6 +192,7 @@ pub const SYS_vhangup: ::c_long = 58;
 pub const SYS_pipe2: ::c_long = 59;
 pub const SYS_quotactl: ::c_long = 60;
 pub const SYS_getdents64: ::c_long = 61;
+pub const SYS_lseek: ::c_long = 62;
 pub const SYS_read: ::c_long = 63;
 pub const SYS_write: ::c_long = 64;
 pub const SYS_readv: ::c_long = 65;
@@ -347,6 +349,7 @@ pub const SYS_request_key: ::c_long = 218;
 pub const SYS_keyctl: ::c_long = 219;
 pub const SYS_clone: ::c_long = 220;
 pub const SYS_execve: ::c_long = 221;
+pub const SYS_mmap: ::c_long = 222;
 pub const SYS_swapon: ::c_long = 224;
 pub const SYS_swapoff: ::c_long = 225;
 pub const SYS_mprotect: ::c_long = 226;
@@ -431,6 +434,10 @@ pub const SYS_syscalls: ::c_long = 451;
 
 pub const PROT_BTI: ::c_int = 0x10;
 pub const PROT_MTE: ::c_int = 0x20;
+
+// From NDK's asm/auxvec.h
+pub const AT_SYSINFO_EHDR: ::c_ulong = 33;
+pub const AT_VECTOR_SIZE_ARCH: ::c_ulong = 2;
 
 mod align;
 pub use self::align::*;

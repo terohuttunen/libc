@@ -2,6 +2,7 @@ pub type c_char = i8;
 pub type wchar_t = u32;
 pub type greg_t = i64;
 pub type __u64 = ::c_ulonglong;
+pub type __s64 = ::c_longlong;
 
 s! {
     pub struct stat {
@@ -360,6 +361,18 @@ pub const SYS_memfd_secret: ::c_long = 447;
 pub const SYS_process_mrelease: ::c_long = 448;
 pub const SYS_futex_waitv: ::c_long = 449;
 pub const SYS_set_mempolicy_home_node: ::c_long = 450;
+
+// From NDK's asm/auxvec.h
+pub const AT_SYSINFO_EHDR: ::c_ulong = 33;
+pub const AT_L1I_CACHESIZE: ::c_ulong = 40;
+pub const AT_L1I_CACHEGEOMETRY: ::c_ulong = 41;
+pub const AT_L1D_CACHESIZE: ::c_ulong = 42;
+pub const AT_L1D_CACHEGEOMETRY: ::c_ulong = 43;
+pub const AT_L2_CACHESIZE: ::c_ulong = 44;
+pub const AT_L2_CACHEGEOMETRY: ::c_ulong = 45;
+pub const AT_L3_CACHESIZE: ::c_ulong = 46;
+pub const AT_L3_CACHEGEOMETRY: ::c_ulong = 47;
+pub const AT_VECTOR_SIZE_ARCH: ::c_ulong = 9;
 
 mod align;
 pub use self::align::*;

@@ -2,6 +2,7 @@ pub type c_char = i8;
 pub type wchar_t = i32;
 pub type greg_t = i64;
 pub type __u64 = ::c_ulonglong;
+pub type __s64 = ::c_longlong;
 
 s! {
     pub struct stat {
@@ -806,6 +807,10 @@ pub const REG_ERR: ::c_int = 19;
 pub const REG_TRAPNO: ::c_int = 20;
 pub const REG_OLDMASK: ::c_int = 21;
 pub const REG_CR2: ::c_int = 22;
+
+// From NDK's asm/auxvec.h
+pub const AT_SYSINFO_EHDR: ::c_ulong = 33;
+pub const AT_VECTOR_SIZE_ARCH: ::c_ulong = 3;
 
 mod align;
 pub use self::align::*;
